@@ -151,7 +151,7 @@ class Layer_back_test:
         return buyin_info_arr
 
     @staticmethod
-    def buyin_n_df(layer_info_arr:list, df:pd=None):
+    def buyin_n_df(layer_info_arr:list, df:pd=None, sp:Stockprice=None):
         money_left_arr = np.zeros(len(layer_info_arr))
         for i, info_dict in enumerate(layer_info_arr):
             money_left_arr[i] = info_dict["money_left"]
@@ -159,10 +159,17 @@ class Layer_back_test:
             df_n = pd.DataFrame(
                 {"code": info_dict["code"], n_col_name: info_dict["n"]}
             ).reset_index(drop=True)
-            if df is None:
-                df = df_n
-            else:
-                df = df.merge(df_n, how="left", on="code")
+            if df is None and not sp is None:
+                date = layer_info_arr[0]['eval_date']
+                df = sp.data[sp.data['time'] == date]
+                df = pd.DataFrame(
+                    index=pd.MultiIndex.from_product(
+                        (df["time"].unique(), df["code"].unique()), names=["time", "code"]
+                    )
+                ).reset_index()
+            elif df is None:
+                raise ValueError(VALUE_E.format(sys._getframe().f_code.co_name))
+            df = df.merge(df_n, how="left", on="code")
             df[n_col_name].fillna(0, inplace=True)
         return df, money_left_arr
 
@@ -219,9 +226,14 @@ class Layer_back_test:
         money_df += money_left_arr
         return money_df
 
-    # @staticmethod
-    # def buyin_n_diff(
-    #     sp: Stockprice,
-    #     layer_info_arr1: list,
-    #     layer_info_arr2: list,
-    # ):
+    @staticmethod
+    def buyin_n_diff(
+        sp: Stockprice,
+        layer_info_arr1: list,
+        layer_info_arr2: list,
+    ):
+        df1, money_left_arr1 = Layer_back_test.buyin_n_df(layer_info_arr1, sp=sp)
+        df2, money_left_arr2 = Layer_back_test.buyin_n_df(layer_info_arr2, sp=sp)
+        n_cols = [i for i in df1.columns if i not in ['time', 'code']]
+        df1[n_cols] = df2[n_cols] - df1[n_cols]
+        return df1

@@ -75,5 +75,6 @@ for i, (eval_date, adj_date) in enumerate([back_test_key_dates[0]]):
     )
 
 # In[3.5]
-# sp_filled = Sp(fill_daily_stockprice=sp)
+df = L.buyin_n_diff(sp, buyin_info_arr, buyin_info_arr)
+
 # In[3.5]
