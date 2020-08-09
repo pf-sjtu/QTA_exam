@@ -1,0 +1,223 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Aug  7 22:30:11 2020
+
+@author: PENG Feng
+@email:  im.pengf@outlook.com
+"""
+import numpy as np
+import pandas as pd
+import sys
+
+from Stockprice import Stockprice
+from utils import str2date, date2str
+from constants import VALUE_E
+
+
+class Layer_back_test:
+    @staticmethod
+    def devide_weights(
+        w: pd.Series, idx: pd.Index, alpha_series: pd.Series, n_layer: int
+    ):
+        a = alpha_series[idx]
+        a_sorted = a.sort_values(ascending=True)
+        w_sorted = w[a_sorted.index]
+        w_sorted_cumsum = np.cumsum(w_sorted)
+        layer_pcts = np.linspace(0, 1, n_layer + 1)
+        layer_idx_dicts = []
+        for i, layer_pct in enumerate(layer_pcts):
+            if i == len(layer_pcts) - 2:
+                index_lc = w_sorted_cumsum.index[w_sorted_cumsum >= layer_pct]
+                index_l = index_lc[0]
+                l_leak = w_sorted_cumsum[index_l] - w_sorted[index_l] < layer_pct
+                layer_idx_dicts.append(
+                    {
+                        "pct": layer_pct,
+                        "index_c": index_lc[1:] if l_leak else index_lc,
+                        "index_l": index_l if l_leak else None,
+                        "index_r": None,
+                        "pct_l": w_sorted_cumsum[index_l] - layer_pct,
+                        "pct_r": 0,
+                    }
+                )
+            elif i == 0:
+                index_lc = w_sorted_cumsum.index[
+                    (w_sorted_cumsum >= layer_pct)
+                    & (w_sorted_cumsum <= layer_pcts[i + 1])
+                ]
+                index_r = w_sorted_cumsum.index[w_sorted_cumsum > layer_pcts[i + 1]][0]
+                r_leak = w_sorted_cumsum[index_r] > layer_pcts[i + 1]
+                layer_idx_dicts.append(
+                    {
+                        "pct": layer_pct,
+                        "index_c": index_lc,
+                        "index_l": None,
+                        "index_r": index_r if r_leak else None,
+                        "pct_l": 0,
+                        "pct_r": w_sorted[index_r]
+                        - w_sorted_cumsum[index_r]
+                        + layer_pcts[i + 1],
+                    }
+                )
+            elif i != len(layer_pcts) - 1:
+                index_lc = w_sorted_cumsum.index[
+                    (w_sorted_cumsum >= layer_pct)
+                    & (w_sorted_cumsum <= layer_pcts[i + 1])
+                ]
+                index_l = index_lc[0]
+                index_r = w_sorted_cumsum.index[w_sorted_cumsum > layer_pcts[i + 1]][0]
+                l_leak = w_sorted_cumsum[index_l] - w_sorted[index_l] < layer_pct
+                r_leak = w_sorted_cumsum[index_r] > layer_pcts[i + 1]
+                layer_idx_dicts.append(
+                    {
+                        "pct": layer_pct,
+                        "index_c": index_lc[1:] if l_leak else index_lc,
+                        "index_l": index_l if l_leak else None,
+                        "index_r": index_r if r_leak else None,
+                        "pct_l": w_sorted_cumsum[index_l] - layer_pct,
+                        "pct_r": w_sorted[index_r]
+                        - w_sorted_cumsum[index_r]
+                        + layer_pcts[i + 1],
+                    }
+                )
+        return layer_idx_dicts
+
+    @staticmethod
+    def alpha_series(sp: Stockprice, alpha_func):
+        alpha_series = sp.data.groupby("code").apply(alpha_func)
+        alpha_series = alpha_series.reset_index()
+        alpha_series.columns = ["code", "index", "alpha"]
+        alpha_series = alpha_series.set_index("index")["alpha"]
+        return alpha_series
+
+    @staticmethod
+    def money_arr(layer_info_arr: list):
+        return [i["money_total"] for i in layer_info_arr]
+
+    @staticmethod
+    def buyin_info(
+        sp: Stockprice,
+        alpha_series: pd.Series,
+        weight_func,
+        n_layer: int,
+        money_arr: list,
+        trade_tax_pct: int = 0,
+        eval_date: str = "2018-01-01",
+        adj_date: str = "2018-01-01",
+    ):
+        # eval_date, adj_date = sp.nearest_2_dates(date)
+        w, idx = weight_func(sp, eval_date)
+        layer_idx_dicts = Layer_back_test.devide_weights(w, idx, alpha_series, n_layer)
+        buyin_code_arr = [
+            sp.data.loc[i["index_c"], "code"].tolist() for i in layer_idx_dicts
+        ]
+        buyin_w_arr = [w.loc[i["index_c"]].tolist() for i in layer_idx_dicts]
+        buyin_info_arr = []
+        df_buyin_on_code = sp.data[sp.data["time"] == adj_date].set_index("code")
+        for i in range(n_layer):
+            index_l = layer_idx_dicts[i]["index_l"]
+            index_r = layer_idx_dicts[i]["index_r"]
+            w_l = layer_idx_dicts[i]["pct_l"]
+            w_r = layer_idx_dicts[i]["pct_r"]
+            if not index_l is None:
+                buyin_code_arr[i] = [sp.data.loc[index_l, "code"]] + buyin_code_arr[i]
+                buyin_w_arr[i] = [w_l] + buyin_w_arr[i]
+            if not index_r is None:
+                buyin_code_arr[i] = buyin_code_arr[i] + [sp.data.loc[index_r, "code"]]
+                buyin_w_arr[i] = buyin_w_arr[i] + [w_r]
+            buyin_money = np.array(buyin_w_arr[i]) * money_arr[i] * n_layer
+            buyin_price = df_buyin_on_code.loc[buyin_code_arr[i], "close"]
+            buyin_price_tax = buyin_price * (1 + trade_tax_pct)
+            buyin_n = np.divide(buyin_money, buyin_price_tax)
+
+            # floor
+            buyin_n = np.floor(buyin_n)
+            money_left = money_arr[i] - np.multiply(buyin_price_tax, buyin_n).sum()
+
+            buyin_info_arr.append(
+                {
+                    "money_total": money_arr[i],
+                    "money_left": money_left,
+                    "code": buyin_code_arr[i],
+                    "weight": buyin_w_arr[i],
+                    "n": buyin_n,
+                    "price": buyin_price,
+                    "price_tax": buyin_price_tax,
+                    "money": buyin_money,
+                    "eval_date": eval_date,
+                    "adj_date": adj_date,
+                }
+            )
+        return buyin_info_arr
+
+    @staticmethod
+    def buyin_n_df(layer_info_arr:list):
+        money_left_arr = np.zeros(len(layer_info_arr))
+        for i, info_dict in enumerate(layer_info_arr):
+            money_left_arr[i] = info_dict["money_left"]
+            n_col_name = "n{}".format(i)
+            df_n = pd.DataFrame(
+                {"code": info_dict["code"], n_col_name: info_dict["n"]}
+            ).reset_index(drop=True)
+            df = df.merge(df_n, how="left", on="code")
+            df[n_col_name].fillna(0, inplace=True)
+
+    @staticmethod
+    def weighted_sum(
+        sp: Stockprice,
+        layer_info_arr: list,
+        date_beg: str = "2018-01-01",
+        date_end: str = "2018-01-01",
+        typ: str = "geq",  # leq geq eq neq
+        price_typ: str = "close",  # open, close
+    ):
+        if not price_typ in ["open", "close"]:
+            raise ValueError(VALUE_E.format(sys._getframe().f_code.co_name))
+        date_beg = str2date(date_beg)
+        date_end = str2date(date_end)
+        df = sp.data
+        if typ == "leq":
+            s1 = df["time"] > date_beg
+            s2 = df["time"] <= date_end
+        elif typ == "geq":
+            s1 = df["time"] >= date_beg
+            s2 = df["time"] < date_end
+        elif typ == "eq":
+            s1 = df["time"] >= date_beg
+            s2 = df["time"] <= date_end
+        elif typ == "eq":
+            s1 = df["time"] > date_beg
+            s2 = df["time"] < date_end
+        else:
+            raise ValueError(VALUE_E.format(sys._getframe().f_code.co_name))
+        df = df.loc[s1 & s2, ["time", "code", "open", "close"]]
+        # not every stock apears everyday
+        # merge number of stocks to price data
+        df, money_left_arr = Layer_back_test()
+        # money_left_arr = np.zeros(len(layer_info_arr))
+        # for i, info_dict in enumerate(layer_info_arr):
+        #     money_left_arr[i] = info_dict["money_left"]
+        #     n_col_name = "n{}".format(i)
+        #     df_n = pd.DataFrame(
+        #         {"code": info_dict["code"], n_col_name: info_dict["n"]}
+        #     ).reset_index(drop=True)
+        #     df = df.merge(df_n, how="left", on="code")
+        #     df[n_col_name].fillna(0, inplace=True)
+
+        money_df = pd.DataFrame(
+            {
+                "money{}".format(i): df.groupby("time").apply(
+                    lambda x: np.dot(x["n{}".format(i)], x[price_typ])
+                )
+                for i in range(len(layer_info_arr))
+            }
+        )
+        money_df += money_left_arr
+        return money_df
+
+    @staticmethod
+    def buyin_n_diff(
+        sp: Stockprice,
+        layer_info_arr1: list,
+        layer_info_arr2: list,
+    ):
