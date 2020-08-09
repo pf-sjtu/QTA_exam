@@ -151,7 +151,7 @@ class Layer_back_test:
         return buyin_info_arr
 
     @staticmethod
-    def buyin_n_df(layer_info_arr:list):
+    def buyin_n_df(layer_info_arr:list, df:pd=None):
         money_left_arr = np.zeros(len(layer_info_arr))
         for i, info_dict in enumerate(layer_info_arr):
             money_left_arr[i] = info_dict["money_left"]
@@ -159,8 +159,12 @@ class Layer_back_test:
             df_n = pd.DataFrame(
                 {"code": info_dict["code"], n_col_name: info_dict["n"]}
             ).reset_index(drop=True)
-            df = df.merge(df_n, how="left", on="code")
+            if df is None:
+                df = df_n
+            else:
+                df = df.merge(df_n, how="left", on="code")
             df[n_col_name].fillna(0, inplace=True)
+        return df, money_left_arr
 
     @staticmethod
     def weighted_sum(
@@ -193,7 +197,7 @@ class Layer_back_test:
         df = df.loc[s1 & s2, ["time", "code", "open", "close"]]
         # not every stock apears everyday
         # merge number of stocks to price data
-        df, money_left_arr = Layer_back_test()
+        df, money_left_arr = Layer_back_test.buyin_n_df(layer_info_arr, df)
         # money_left_arr = np.zeros(len(layer_info_arr))
         # for i, info_dict in enumerate(layer_info_arr):
         #     money_left_arr[i] = info_dict["money_left"]
@@ -215,9 +219,9 @@ class Layer_back_test:
         money_df += money_left_arr
         return money_df
 
-    @staticmethod
-    def buyin_n_diff(
-        sp: Stockprice,
-        layer_info_arr1: list,
-        layer_info_arr2: list,
-    ):
+    # @staticmethod
+    # def buyin_n_diff(
+    #     sp: Stockprice,
+    #     layer_info_arr1: list,
+    #     layer_info_arr2: list,
+    # ):
