@@ -8,10 +8,10 @@ Created on Fri Aug  7 11:25:38 2020
 from utils import date_str_p1
 import os
 
-if not os.path.isdir('../input'):
-    os.makedirs('../input')
-if not os.path.isdir('../output'):
-    os.makedirs('../output')
+if not os.path.isdir("../input"):
+    os.makedirs("../input")
+if not os.path.isdir("../output"):
+    os.makedirs("../output")
 
 TYPE_E = "{}: improper types or lengths of parameters."
 VALUE_E = "{}: improper range of parameters."
@@ -29,3 +29,7 @@ for i in range(BACK_TEST_N_MONTH + 1):
 
 N_MONEY_ADJ_ITER_A = 0.4
 N_MONEY_ADJ_ITER_B = 1
+
+N_ANNUAL_TRADING_DAY = 250
+
+RISK_FREE_ANNUAL_RETURN_RATIO = 0.015

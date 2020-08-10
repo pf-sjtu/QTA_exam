@@ -72,7 +72,7 @@ class Stockprice(object):
         df = df.merge(df_fill, how="outer", on=["time", "code"]).sort_values(
             ["time", "code"]
         )
-        fill_cols = ['open', 'close']
+        fill_cols = ["open", "close"]
         # fill_cols = ["open", "close", "high", "low", "volume", "money"]
         if df[fill_cols].isnull().sum(axis=0).sum() > 0:
             df[fill_cols] = df.groupby("code")[fill_cols].fillna(method="ffill")
@@ -158,7 +158,7 @@ class Stockprice(object):
         weight_col: str = "money",
         money_init: float = 1e6,
         trade_tax_pct: float = 0,
-        ax = None,
+        ax=None,
     ):
         date1, date2 = self.nearest_2_dates(date_beg)
         date_end1, date_end2 = self.nearest_2_dates(date_end)

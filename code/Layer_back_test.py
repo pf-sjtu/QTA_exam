@@ -11,7 +11,13 @@ import sys
 
 from Stockprice import Stockprice
 from utils import str2date, date2str
-from constants import VALUE_E, N_MONEY_ADJ_ITER_A, N_MONEY_ADJ_ITER_B
+from constants import (
+    VALUE_E,
+    N_MONEY_ADJ_ITER_A,
+    N_MONEY_ADJ_ITER_B,
+    N_ANNUAL_TRADING_DAY,
+    RISK_FREE_ANNUAL_RETURN_RATIO,
+)
 
 
 class Layer_back_test:
@@ -282,31 +288,40 @@ class Layer_back_test:
         return df1
 
     @staticmethod
-    def annual_return(
-        sp:Stockprice, ptf_money:pd.DataFrame
-    ):
+    def return_ratio(ptf_money: pd.DataFrame):
+        r = ptf_money.iloc[-1, :] / ptf_money.iloc[0, :]
+        ar = r ** (N_ANNUAL_TRADING_DAY / r.shape[0])
+        return ar
+
+    @staticmethod
+    def volatility(ptf_money: pd.DataFrame):
+        dr = ptf_money / ptf_money.shift(1)
+        dv = np.std(dr.iloc[1:, :], axis=0, ddof=0)
+        av = dv * np.sqrt(N_ANNUAL_TRADING_DAY)
+        return av
+
+    @staticmethod
+    def sharpe_ratio(ptf_money: pd.DataFrame):
+        av = Layer_back_test.volatility(ptf_money)
+        ar = Layer_back_test.return_ratio(ptf_money)
+        asharp = (ar - RISK_FREE_ANNUAL_RETURN_RATIO) / av
+        return asharp
+
+    @staticmethod
+    def information_ratio(ptf_money: pd.DataFrame):
+        dr = ptf_money / ptf_money.shift(1)
+        d_risk_free_r = RISK_FREE_ANNUAL_RETURN_RATIO ** (1 / N_ANNUAL_TRADING_DAY)
+        dr_surplus = dr - d_risk_free_r
+        dt = np.std(dr_surplus.iloc[1:, :], axis=0, ddof=0)
+        at = dt * np.sqrt(N_ANNUAL_TRADING_DAY)
+        ar = Layer_back_test.return_ratio(ptf_money)
+        air = (ar - RISK_FREE_ANNUAL_RETURN_RATIO) / at
+        return air
+
+    @staticmethod
+    def max_drawdown(ptf_money: pd.DataFrame):
         return 1
 
     @staticmethod
-    def sharpe_ratio(
-        sp:Stockprice, ptf_money:pd.DataFrame
-    ):
-        return 1
-
-    @staticmethod
-    def information_ratio(
-        sp:Stockprice, ptf_money:pd.DataFrame
-    ):
-        return 1
-
-    @staticmethod
-    def max_drawdown(
-        sp:Stockprice, ptf_money:pd.DataFrame
-    ):
-        return 1
-
-    @staticmethod
-    def winning_ratio(
-        sp:Stockprice, ptf_money:pd.DataFrame
-    ):
+    def winning_ratio(ptf_money: pd.DataFrame):
         return 1

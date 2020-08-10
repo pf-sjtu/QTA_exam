@@ -7,7 +7,6 @@ Created on Fri Aug  7 11:32:11 2020
 """
 import pandas as pd
 import numpy as np
-import datetime
 import sys
 
 from constants import TYPE_E, VALUE_E

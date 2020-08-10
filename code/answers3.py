@@ -111,7 +111,12 @@ for layer in range(n_layer):
     ax.plot(s.index, s, label="portfolio {}".format(layer))
 
 for i, (eval_date, adj_date) in enumerate(back_test_key_dates[:-1]):
-    ax.axvline(x=adj_date, color='grey', linestyle='--', label='warehouse transfer date' if i==0 else None)
+    ax.axvline(
+        x=adj_date,
+        color="grey",
+        linestyle="--",
+        label="warehouse transfer date" if i == 0 else None,
+    )
 
 
 # money_df = sp.portfolio_simple_test_plot(
@@ -124,9 +129,12 @@ for i, (eval_date, adj_date) in enumerate(back_test_key_dates[:-1]):
 # )
 
 ax.legend(loc="upper right")
-ax.set_xlabel('Date')
-ax.set_ylabel('Close Price')
-fig.savefig(FIG_DIR + "_({}_{}).pdf".format(alphas[alpha_i]["name"], weights[weight_i]["name"]), bbox_inches='tight')
+ax.set_xlabel("Date")
+ax.set_ylabel("Close Price")
+fig.savefig(
+    FIG_DIR + "_({}_{}).pdf".format(alphas[alpha_i]["name"], weights[weight_i]["name"]),
+    bbox_inches="tight",
+)
 
 # In[3.5]
 # if False:
