@@ -11,7 +11,7 @@ import sys
 
 from Stockprice import Stockprice
 from utils import str2date, date2str
-from constants import VALUE_E
+from constants import VALUE_E, N_MONEY_ADJ_ITER_A, N_MONEY_ADJ_ITER_B
 
 
 class Layer_back_test:
@@ -104,8 +104,8 @@ class Layer_back_test:
         trade_tax_pct: int = 0,
         eval_date: str = "2018-01-01",
         adj_date: str = "2018-01-01",
+        layer_info_arr0: list = None,
     ):
-        # eval_date, adj_date = sp.nearest_2_dates(date)
         w, idx = weight_func(sp, eval_date)
         layer_idx_dicts = Layer_back_test.devide_weights(w, idx, alpha_series, n_layer)
         buyin_code_arr = [
@@ -114,6 +114,8 @@ class Layer_back_test:
         buyin_w_arr = [w.loc[i["index_c"]].tolist() for i in layer_idx_dicts]
         buyin_info_arr = []
         df_buyin_on_code = sp.data[sp.data["time"] == adj_date].set_index("code")
+        if not layer_info_arr0 is None:
+            buyin_n0_df = Layer_back_test.buyin_n_df(layer_info_arr0, sp=sp)[0].set_index('code')
         for i in range(n_layer):
             index_l = layer_idx_dicts[i]["index_l"]
             index_r = layer_idx_dicts[i]["index_r"]
@@ -125,19 +127,38 @@ class Layer_back_test:
             if not index_r is None:
                 buyin_code_arr[i] = buyin_code_arr[i] + [sp.data.loc[index_r, "code"]]
                 buyin_w_arr[i] = buyin_w_arr[i] + [w_r]
-            buyin_money = np.array(buyin_w_arr[i]) * money_arr[i] * n_layer
+            buyin_money = np.array(buyin_w_arr[i]) * n_layer * money_arr[i]
             buyin_price = df_buyin_on_code.loc[buyin_code_arr[i], "close"]
+            ##
+            if not layer_info_arr0 is None:
+                money_adj_total = 0
+                if trade_tax_pct != 0:
+                    buyin_money0 = np.multiply(buyin_n0_df.loc[buyin_code_arr[i], 'n{}'.format(i)], buyin_price)
+                    n_money_adj_iter = int(N_MONEY_ADJ_ITER_A * np.log10(money_arr[i] * trade_tax_pct)) + N_MONEY_ADJ_ITER_B
+                    for j in range(n_money_adj_iter):
+                        stady_money = np.where(buyin_money > buyin_money0, buyin_money0, buyin_money)
+                        money_adj = stady_money.sum() * trade_tax_pct
+                        money_adj_total += money_adj
+                        buyin_money *= 1 + (money_adj / money_arr[i])
+            ##
             buyin_price_tax = buyin_price * (1 + trade_tax_pct)
             buyin_n = np.divide(buyin_money, buyin_price_tax)
 
             # floor
             buyin_n = np.floor(buyin_n)
             money_left = money_arr[i] - np.multiply(buyin_price_tax, buyin_n).sum()
+            money_stock = np.multiply(buyin_price, buyin_n).sum()
+            money_tax = np.multiply(buyin_price_tax - buyin_price, buyin_n).sum()
+            if not layer_info_arr0 is None:
+                money_left += money_adj_total
+                money_tax -= money_adj_total
 
             buyin_info_arr.append(
                 {
                     "money_total": money_arr[i],
                     "money_left": money_left,
+                    "money_stock": money_stock,
+                    "money_tax": money_tax,
                     "code": buyin_code_arr[i],
                     "weight": buyin_w_arr[i],
                     "n": buyin_n,
@@ -149,6 +170,29 @@ class Layer_back_test:
                 }
             )
         return buyin_info_arr
+
+    # @staticmethod
+    # def buyin_money_df(layer_info_arr:list, df:pd=None, sp:Stockprice=None):
+    #     money_left_arr = np.zeros(len(layer_info_arr))
+    #     for i, info_dict in enumerate(layer_info_arr):
+    #         money_left_arr[i] = info_dict["money_left"]
+    #         n_col_name = "n{}".format(i)
+    #         df_n = pd.DataFrame(
+    #             {"code": info_dict["code"], n_col_name: info_dict["n"]}
+    #         ).reset_index(drop=True)
+    #         if df is None and not sp is None:
+    #             date = layer_info_arr[0]['eval_date']
+    #             df = sp.data[sp.data['time'] == date]
+    #             df = pd.DataFrame(
+    #                 index=pd.MultiIndex.from_product(
+    #                     (df["time"].unique(), df["code"].unique()), names=["time", "code"]
+    #                 )
+    #             ).reset_index()
+    #         elif df is None:
+    #             raise ValueError(VALUE_E.format(sys._getframe().f_code.co_name))
+    #         df = df.merge(df_n, how="left", on="code")
+    #         df[n_col_name].fillna(0, inplace=True)
+    #     return df, money_left_arr
 
     @staticmethod
     def buyin_n_df(layer_info_arr:list, df:pd=None, sp:Stockprice=None):
@@ -205,15 +249,6 @@ class Layer_back_test:
         # not every stock apears everyday
         # merge number of stocks to price data
         df, money_left_arr = Layer_back_test.buyin_n_df(layer_info_arr, df)
-        # money_left_arr = np.zeros(len(layer_info_arr))
-        # for i, info_dict in enumerate(layer_info_arr):
-        #     money_left_arr[i] = info_dict["money_left"]
-        #     n_col_name = "n{}".format(i)
-        #     df_n = pd.DataFrame(
-        #         {"code": info_dict["code"], n_col_name: info_dict["n"]}
-        #     ).reset_index(drop=True)
-        #     df = df.merge(df_n, how="left", on="code")
-        #     df[n_col_name].fillna(0, inplace=True)
 
         money_df = pd.DataFrame(
             {
@@ -237,3 +272,14 @@ class Layer_back_test:
         n_cols = [i for i in df1.columns if i not in ['time', 'code']]
         df1[n_cols] = df2[n_cols] - df1[n_cols]
         return df1
+
+    @staticmethod
+    def adj_buyin_money(
+        sp: Stockprice,
+        layer_info_arr1: list,
+        layer_info_arr2: list,
+    ):
+        buyin_n_diff = Layer_back_test.buyin_n_diff(sp,
+        layer_info_arr1,
+        layer_info_arr2,
+    )
