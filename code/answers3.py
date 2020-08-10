@@ -108,8 +108,11 @@ import matplotlib.pyplot as plt
 fig, ax = plt.subplots(figsize=(20, 10))
 for layer in range(n_layer):
     s = ptf_money.iloc[:, layer]
-    ax.plot(s.index, s, label="portfolio{}".format(layer))
-ax.legend(loc="upper right")
+    ax.plot(s.index, s, label="portfolio {}".format(layer))
+
+for i, (eval_date, adj_date) in enumerate(back_test_key_dates[:-1]):
+    ax.axvline(x=adj_date, color='grey', linestyle='--', label='warehouse transfer date' if i==0 else None)
+
 
 # money_df = sp.portfolio_simple_test_plot(
 #     date_beg="2018-1-1",
@@ -120,6 +123,7 @@ ax.legend(loc="upper right")
 #     ax=ax,
 # )
 
+ax.legend(loc="upper right")
 ax.set_xlabel('Date')
 ax.set_ylabel('Close Price')
 fig.savefig(FIG_DIR + "_({}_{}).pdf".format(alphas[alpha_i]["name"], weights[weight_i]["name"]), bbox_inches='tight')

@@ -282,9 +282,31 @@ class Layer_back_test:
         return df1
 
     @staticmethod
-    def adj_buyin_money(
-        sp: Stockprice, layer_info_arr1: list, layer_info_arr2: list,
+    def annual_return(
+        sp:Stockprice, ptf_money:pd.DataFrame
     ):
-        buyin_n_diff = Layer_back_test.buyin_n_diff(
-            sp, layer_info_arr1, layer_info_arr2,
-        )
+        return 1
+
+    @staticmethod
+    def sharpe_ratio(
+        sp:Stockprice, ptf_money:pd.DataFrame
+    ):
+        return 1
+
+    @staticmethod
+    def information_ratio(
+        sp:Stockprice, ptf_money:pd.DataFrame
+    ):
+        return 1
+
+    @staticmethod
+    def max_drawdown(
+        sp:Stockprice, ptf_money:pd.DataFrame
+    ):
+        return 1
+
+    @staticmethod
+    def winning_ratio(
+        sp:Stockprice, ptf_money:pd.DataFrame
+    ):
+        return 1
