@@ -6,10 +6,18 @@ Created on Fri Aug  7 11:25:38 2020
 @email:  im.pengf@outlook.com
 """
 from utils import date_str_p1
+import os
+
+if not os.path.isdir('../input'):
+    os.makedirs('../input')
+if not os.path.isdir('../output'):
+    os.makedirs('../output')
 
 TYPE_E = "{}: improper types or lengths of parameters."
 VALUE_E = "{}: improper range of parameters."
 DATA_DIR = "../input/stockprice.csv"
+BUFF_DIR = "../input/stockprice.pickle"
+FIG_DIR = "../output/portfolio_back_test"
 
 
 BACK_TEST_DATE_BEG = "2018-1-1"

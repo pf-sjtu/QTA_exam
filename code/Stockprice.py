@@ -6,10 +6,15 @@ Created on Fri Aug  7 11:24:21 2020
 @email:  im.pengf@outlook.com
 """
 import pandas as pd
+import numpy as np
 from collections.abc import Iterable
 import sys
+import pickle
+import os
+import matplotlib.pyplot as plt
+import matplotlib
 
-from constants import DATA_DIR, TYPE_E, VALUE_E, BACK_TEST_MONTHS
+from constants import DATA_DIR, BUFF_DIR, TYPE_E, VALUE_E, BACK_TEST_MONTHS
 from utils import str2date
 
 
@@ -18,22 +23,27 @@ class Stockprice(object):
         self,
         data_dir: str = DATA_DIR,
         test: [bool, int] = False,
-        # fill_daily_stockprice=None,
+        buff: bool = False,
+        load_buff: bool = False,
     ):
-        # if fill_daily_stockprice is None:
-        test_nrows = 1000
-        if isinstance(test, int) and test > 0:
-            test_nrows = test
-            test = True
-        df = pd.read_csv(data_dir, nrows=test_nrows if test else None)
-        df.drop(columns=df.columns[0], inplace=True)
-        df["time"] = pd.to_datetime(df["time"], format="%Y-%m-%d")
-        df = df[df.isnull().sum(axis=1) != df.shape[1] - 2]
-        self.data = df.sort_values(["time", "code"], ascending=True)
-        self._back_test_wash()
-        self._fill_daily_stockprice()
-        # else:
-        # self.data = self._fill_daily_stockprice(fill_daily_stockprice)
+        if load_buff and os.path.isfile(BUFF_DIR):
+            with open(BUFF_DIR, "rb") as f:
+                self.data = pickle.load(f)
+        else:
+            test_nrows = 1000
+            if isinstance(test, int) and test > 0:
+                test_nrows = test
+                test = True
+            df = pd.read_csv(data_dir, nrows=test_nrows if test else None)
+            df.drop(columns=df.columns[0], inplace=True)
+            df["time"] = pd.to_datetime(df["time"], format="%Y-%m-%d")
+            df = df[df.isnull().sum(axis=1) != df.shape[1] - 2]
+            self.data = df.sort_values(["time", "code"], ascending=True)
+            self._back_test_wash()
+            self._fill_daily_stockprice()
+            if buff:
+                with open(BUFF_DIR, "wb") as f:
+                    pickle.dump(self.data, f)
 
     def _back_test_wash(self):
         df = self.data
@@ -53,9 +63,6 @@ class Stockprice(object):
         self.data = df.drop(index=df_invalid_idx)
 
     def _fill_daily_stockprice(self):
-        # if not hasattr(sp, "data"):
-        #     raise ValueError(VALUE_E.format(sys._getframe().f_code.co_name))
-        # df = sp.data.reset_index()
         df = self.data.reset_index()
         df_fill = pd.DataFrame(
             index=pd.MultiIndex.from_product(
@@ -65,18 +72,15 @@ class Stockprice(object):
         df = df.merge(df_fill, how="outer", on=["time", "code"]).sort_values(
             ["time", "code"]
         )
-        if df[["open", "close"]].isnull().sum(axis=0).sum() > 0:
-            df[["open", "close"]] = df.groupby("code")[["open", "close"]].fillna(
-                method="ffill"
-            )
-        if df[["open", "close"]].isnull().sum(axis=0).sum() > 0:
-            df[["open", "close"]] = df.groupby("code")[["open", "close"]].fillna(
-                method="bfill"
-            )
+        # fill_cols = ['open', 'close']
+        fill_cols = ["open", "close", "high", "low", "volume", "money"]
+        if df[fill_cols].isnull().sum(axis=0).sum() > 0:
+            df[fill_cols] = df.groupby("code")[fill_cols].fillna(method="ffill")
+        if df[fill_cols].isnull().sum(axis=0).sum() > 0:
+            df[fill_cols] = df.groupby("code")[fill_cols].fillna(method="bfill")
         df["index"] = df["index"].fillna(df["index"].max() + 1).astype("int")
         df.set_index("index", inplace=True)
         self.data = df
-        # return df
 
     def shape(self):
         return self.data.shape
@@ -146,3 +150,38 @@ class Stockprice(object):
     def date_fetch(self, date: str = "2018-01-01"):
         date = str2date(date)
         return self.data[self.data["time"] == date]
+
+    def portfolio_simple_test_plot(
+        self,
+        date_beg: str = "2018-1-1",
+        date_end: str = "2019-1-1",
+        weight_col: str = "money",
+        money_init: float = 1e6,
+        trade_tax_pct: float = 0,
+        ax = None,
+    ):
+        date1, date2 = self.nearest_2_dates(date_beg)
+        date_end1, date_end2 = self.nearest_2_dates(date_end)
+        df = self.data[self.data["time"] == date1]
+        money_arr = df[weight_col]
+        w = money_arr / money_arr.sum()
+        money_arr = money_init * w
+        price_arr = df["close"]
+        n = np.floor(money_arr / price_arr / (1 + trade_tax_pct))
+        money_left = money_init - np.dot(n, price_arr * (1 + trade_tax_pct))
+        df = df[["code"]]
+        df["n"] = n
+        df = self.data[
+            (self.data["time"] >= date1) & (self.data["time"] <= date_end2)
+        ].merge(df, how="left", on="code")
+        money_df = pd.DataFrame(
+            {"money": df.groupby("time").apply(lambda x: np.dot(x["n"], x["close"]))}
+        )
+        money_df += money_left
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(10, 5))
+        ax.plot(
+            money_df.index, money_df, label="{}-weighted portfolio".format(weight_col)
+        )
+        ax.legend(loc="upper right")
+        return money_df

@@ -25,5 +25,3 @@ t2 = t0.merge(t1, how="outer", on=["a", "b"])
 
 t2.groupby(["a"])["c"].fillna(method="ffill", inplace=True)
 # t3 = t2.groupby(['a'])['c'].fillna(method='ffill', inplace=False)
-
-

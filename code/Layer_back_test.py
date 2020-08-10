@@ -115,7 +115,9 @@ class Layer_back_test:
         buyin_info_arr = []
         df_buyin_on_code = sp.data[sp.data["time"] == adj_date].set_index("code")
         if not layer_info_arr0 is None:
-            buyin_n0_df = Layer_back_test.buyin_n_df(layer_info_arr0, sp=sp)[0].set_index('code')
+            buyin_n0_df = Layer_back_test.buyin_n_df(layer_info_arr0, sp=sp)[
+                0
+            ].set_index("code")
         for i in range(n_layer):
             index_l = layer_idx_dicts[i]["index_l"]
             index_r = layer_idx_dicts[i]["index_r"]
@@ -133,10 +135,17 @@ class Layer_back_test:
             if not layer_info_arr0 is None:
                 money_adj_total = 0
                 if trade_tax_pct != 0:
-                    buyin_money0 = np.multiply(buyin_n0_df.loc[buyin_code_arr[i], 'n{}'.format(i)], buyin_price)
-                    n_money_adj_iter = int(N_MONEY_ADJ_ITER_A * np.log10(money_arr[i] * trade_tax_pct)) + N_MONEY_ADJ_ITER_B
+                    buyin_money0 = np.multiply(
+                        buyin_n0_df.loc[buyin_code_arr[i], "n{}".format(i)], buyin_price
+                    )
+                    n_money_adj_iter = (
+                        int(N_MONEY_ADJ_ITER_A * np.log10(money_arr[i] * trade_tax_pct))
+                        + N_MONEY_ADJ_ITER_B
+                    )
                     for j in range(n_money_adj_iter):
-                        stady_money = np.where(buyin_money > buyin_money0, buyin_money0, buyin_money)
+                        stady_money = np.where(
+                            buyin_money > buyin_money0, buyin_money0, buyin_money
+                        )
                         money_adj = stady_money.sum() * trade_tax_pct
                         money_adj_total += money_adj
                         buyin_money *= 1 + (money_adj / money_arr[i])
@@ -195,7 +204,7 @@ class Layer_back_test:
     #     return df, money_left_arr
 
     @staticmethod
-    def buyin_n_df(layer_info_arr:list, df:pd=None, sp:Stockprice=None):
+    def buyin_n_df(layer_info_arr: list, df: pd = None, sp: Stockprice = None):
         money_left_arr = np.zeros(len(layer_info_arr))
         for i, info_dict in enumerate(layer_info_arr):
             money_left_arr[i] = info_dict["money_left"]
@@ -204,11 +213,12 @@ class Layer_back_test:
                 {"code": info_dict["code"], n_col_name: info_dict["n"]}
             ).reset_index(drop=True)
             if df is None and not sp is None:
-                date = layer_info_arr[0]['eval_date']
-                df = sp.data[sp.data['time'] == date]
+                date = layer_info_arr[0]["eval_date"]
+                df = sp.data[sp.data["time"] == date]
                 df = pd.DataFrame(
                     index=pd.MultiIndex.from_product(
-                        (df["time"].unique(), df["code"].unique()), names=["time", "code"]
+                        (df["time"].unique(), df["code"].unique()),
+                        names=["time", "code"],
                     )
                 ).reset_index()
             elif df is None:
@@ -263,23 +273,18 @@ class Layer_back_test:
 
     @staticmethod
     def buyin_n_diff(
-        sp: Stockprice,
-        layer_info_arr1: list,
-        layer_info_arr2: list,
+        sp: Stockprice, layer_info_arr1: list, layer_info_arr2: list,
     ):
         df1, money_left_arr1 = Layer_back_test.buyin_n_df(layer_info_arr1, sp=sp)
         df2, money_left_arr2 = Layer_back_test.buyin_n_df(layer_info_arr2, sp=sp)
-        n_cols = [i for i in df1.columns if i not in ['time', 'code']]
+        n_cols = [i for i in df1.columns if i not in ["time", "code"]]
         df1[n_cols] = df2[n_cols] - df1[n_cols]
         return df1
 
     @staticmethod
     def adj_buyin_money(
-        sp: Stockprice,
-        layer_info_arr1: list,
-        layer_info_arr2: list,
+        sp: Stockprice, layer_info_arr1: list, layer_info_arr2: list,
     ):
-        buyin_n_diff = Layer_back_test.buyin_n_diff(sp,
-        layer_info_arr1,
-        layer_info_arr2,
-    )
+        buyin_n_diff = Layer_back_test.buyin_n_diff(
+            sp, layer_info_arr1, layer_info_arr2,
+        )
