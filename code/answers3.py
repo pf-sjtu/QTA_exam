@@ -63,13 +63,18 @@ for month in BACK_TEST_MONTHS:
     eval_date, adj_date = sp.nearest_2_dates(month)
     back_test_key_dates.append((eval_date, adj_date))
 
+# In[3.3]
+# eval_date, adj_date = back_test_key_dates[0]
+# w, idx = weight_func(sp, eval_date=)
+# layer_idx_dicts = Layer_back_test.devide_weights(w, idx, alpha_series, n_layer)
+
 # In[3.4]
 money_arr = np.ones(n_layer) * layer_money_init
 ptf_money = None
 buyin_info_arr0 = None
 layer_info_total = []
 for i, (eval_date, adj_date) in enumerate(back_test_key_dates[:-1]):
-    print(i)
+    print("Running back test... ({}/{})".format(i, len(back_test_key_dates) - 2))
     buyin_info_arr = L.buyin_info(
         sp=sp,
         alpha_series=alpha_series,

@@ -12,7 +12,7 @@ class Weights:
     @staticmethod
     def _delisted(sp: Stockprice, date: str = "2020-08-01"):
         df = sp.date_fetch(date)
-        delisted = df["money"] == 0
+        delisted = (df["money"] == 0) | (df["money"].isnull())
         return delisted, df
 
     @staticmethod
