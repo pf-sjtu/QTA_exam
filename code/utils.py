@@ -31,6 +31,7 @@ def print_alpha_ans(df, date_beg: str = "2018-01-01", n_day: int = 10):
     date_beg = str2date(date_beg)
     df = df[df["time"] >= date_beg].iloc[:n_day, :]
     print(df)
+    print("")
 
 
 def date_arr_p1(date_arr):

@@ -12,9 +12,8 @@ import sys
 import pickle
 import os
 import matplotlib.pyplot as plt
-import matplotlib
 
-from constants import DATA_DIR, BUFF_SP_DIR, TYPE_E, VALUE_E, BACK_TEST_MONTHS
+from constants import DATA_DIR, BUFF_SP_DIR, TYPE_E, BACK_TEST_MONTHS
 from utils import str2date
 
 
@@ -29,6 +28,7 @@ class Stockprice(object):
         if load_buff and os.path.isfile(BUFF_SP_DIR):
             with open(BUFF_SP_DIR, "rb") as f:
                 self.data = pickle.load(f)
+            print('Loaded stock prices from: {}'.format(BUFF_SP_DIR))
         else:
             test_nrows = 1000
             if isinstance(test, int) and test > 0:
@@ -41,9 +41,10 @@ class Stockprice(object):
             self.data = df.sort_values(["time", "code"], ascending=True)
             self._back_test_wash()
             self._fill_daily_stockprice()
-            if buff:
+            if buff or load_buff:
                 with open(BUFF_SP_DIR, "wb") as f:
                     pickle.dump(self.data, f)
+                print('Dumped stock prices to: {}'.format(BUFF_SP_DIR))
 
     def _back_test_wash(self):
         df = self.data
@@ -157,7 +158,7 @@ class Stockprice(object):
         date_end: str = "2019-1-1",
         weight_col: str = "money",
         money_init: float = 1e6,
-        trade_tax_pct: float = 0,
+        trade_tax_ratio: float = 0,
         ax=None,
     ):
         date1, date2 = self.nearest_2_dates(date_beg)
@@ -167,8 +168,8 @@ class Stockprice(object):
         w = money_arr / money_arr.sum()
         money_arr = money_init * w
         price_arr = df["close"]
-        n = np.floor(money_arr / price_arr / (1 + trade_tax_pct))
-        money_left = money_init - np.dot(n, price_arr * (1 + trade_tax_pct))
+        n = np.floor(money_arr / price_arr / (1 + trade_tax_ratio))
+        money_left = money_init - np.dot(n, price_arr * (1 + trade_tax_ratio))
         df = df[["code"]]
         df["n"] = n
         df = self.data[

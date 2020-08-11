@@ -8,9 +8,10 @@ Created on Fri Aug  7 22:30:11 2020
 import numpy as np
 import pandas as pd
 import sys
-import matplotlib.pyplot as plt
 import os
 import pickle
+from matplotlib import pyplot as plt
+from collections.abc import Iterable
 
 from Stockprice import Stockprice
 from utils import str2date, date2str
@@ -97,18 +98,20 @@ class Layer_back_test:
         if load_buff and os.path.isfile(BUFF_ALPHA_DIR):
             with open(BUFF_ALPHA_DIR, "rb") as f:
                 alpha_series = pickle.load(f)
+            print('Loaded stock prices from: {}'.format(BUFF_ALPHA_DIR))
         else:
             alpha_series = sp.data.groupby("code").apply(alpha_func)
             alpha_series = alpha_series.reset_index()
             alpha_series.columns = ["code", "index", "alpha"]
             alpha_series = alpha_series.set_index("index")["alpha"]
-            if buff:
+            if buff or load_buff:
                 with open(BUFF_ALPHA_DIR, "wb") as f:
                     pickle.dump(alpha_series, f)
+                print('Dumped stock prices to: {}'.format(BUFF_ALPHA_DIR))
         return alpha_series
 
     @staticmethod
-    def money_arr(layer_info_arr: list):
+    def money_arr(layer_info_arr: Iterable):
         return [i["money_total"] for i in layer_info_arr]
 
     @staticmethod
@@ -117,11 +120,11 @@ class Layer_back_test:
         alpha_series: pd.Series,
         weight_func,
         n_layer: int,
-        money_arr: list,
-        trade_tax_pct: int = 0,
+        money_arr: Iterable,
+        trade_tax_ratio: int = 0,
         eval_date: str = "2018-01-01",
         adj_date: str = "2018-01-01",
-        layer_info_arr0: list = None,
+        layer_info_arr0: Iterable = None,
     ):
         w, idx = weight_func(sp, eval_date)
         layer_idx_dicts = Layer_back_test.devide_weights(w, idx, alpha_series, n_layer)
@@ -151,23 +154,26 @@ class Layer_back_test:
             ##
             if not layer_info_arr0 is None:
                 money_adj_total = 0
-                if trade_tax_pct != 0:
+                if trade_tax_ratio != 0:
                     buyin_money0 = np.multiply(
                         buyin_n0_df.loc[buyin_code_arr[i], "n{}".format(i)], buyin_price
                     )
                     n_money_adj_iter = (
-                        int(N_MONEY_ADJ_ITER_A * np.log10(money_arr[i] * trade_tax_pct))
+                        int(
+                            N_MONEY_ADJ_ITER_A
+                            * np.log10(money_arr[i] * trade_tax_ratio)
+                        )
                         + N_MONEY_ADJ_ITER_B
                     )
                     for j in range(n_money_adj_iter):
                         stady_money = np.where(
                             buyin_money > buyin_money0, buyin_money0, buyin_money
                         )
-                        money_adj = stady_money.sum() * trade_tax_pct
+                        money_adj = stady_money.sum() * trade_tax_ratio
                         money_adj_total += money_adj
                         buyin_money *= 1 + (money_adj / money_arr[i])
             ##
-            buyin_price_tax = buyin_price * (1 + trade_tax_pct)
+            buyin_price_tax = buyin_price * (1 + trade_tax_ratio)
             buyin_n = np.divide(buyin_money, buyin_price_tax)
 
             # floor
@@ -221,7 +227,7 @@ class Layer_back_test:
     #     return df, money_left_arr
 
     @staticmethod
-    def buyin_n_df(layer_info_arr: list, df: pd = None, sp: Stockprice = None):
+    def buyin_n_df(layer_info_arr: Iterable, df: pd = None, sp: Stockprice = None):
         money_left_arr = np.zeros(len(layer_info_arr))
         for i, info_dict in enumerate(layer_info_arr):
             money_left_arr[i] = info_dict["money_left"]
@@ -247,7 +253,7 @@ class Layer_back_test:
     @staticmethod
     def weighted_sum(
         sp: Stockprice,
-        layer_info_arr: list,
+        layer_info_arr: Iterable,
         date_beg: str = "2018-01-01",
         date_end: str = "2018-01-01",
         typ: str = "geq",  # leq geq eq neq
@@ -290,7 +296,7 @@ class Layer_back_test:
 
     @staticmethod
     def buyin_n_diff(
-        sp: Stockprice, layer_info_arr1: list, layer_info_arr2: list,
+        sp: Stockprice, layer_info_arr1: Iterable, layer_info_arr2: Iterable,
     ):
         df1, money_left_arr1 = Layer_back_test.buyin_n_df(layer_info_arr1, sp=sp)
         df2, money_left_arr2 = Layer_back_test.buyin_n_df(layer_info_arr2, sp=sp)
@@ -302,11 +308,11 @@ class Layer_back_test:
     def layer_money_series(
         sp: Stockprice,
         alpha_series: pd.Series,
-        money_arr: list,
-        back_test_key_dates: list,
+        money_arr: Iterable,
+        back_test_key_dates: Iterable,
         weight_func,
         n_layer: int,
-        trade_tax_pct: float,
+        trade_tax_ratio: float,
     ):
         ptf_money = None
         buyin_info_arr0 = None
@@ -321,7 +327,7 @@ class Layer_back_test:
                 weight_func=weight_func,
                 n_layer=n_layer,
                 money_arr=money_arr,
-                trade_tax_pct=trade_tax_pct,
+                trade_tax_ratio=trade_tax_ratio,
                 eval_date=date2str(eval_date),
                 adj_date=date2str(adj_date),
                 layer_info_arr0=buyin_info_arr0,
@@ -345,7 +351,7 @@ class Layer_back_test:
 
     @staticmethod
     def portfolio_plot(
-        ptf_money: pd.DataFrame, back_test_key_dates: list = None, ax=None
+        ptf_money: pd.DataFrame, back_test_key_dates: Iterable = None, ax=None
     ):
         if ax is None:
             fig, ax = plt.subplots(figsize=(16, 8))
