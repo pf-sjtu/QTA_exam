@@ -12,11 +12,17 @@ import matplotlib.pyplot as plt
 from Stockprice import Stockprice as Sp
 from Factors import Factors as F
 from Weights import Weights as W
-from Layer_back_test import Layer_back_test as L
-from Back_test import Back_test as B
-from constants import BACK_TEST_MONTHS, FIG_DIR
+from Layer_backtest import Layer_backtest as L
+from Backtest import Backtest as B
+from constants import (
+    BACKTEST_MONTHS,
+    FIG_DIR,
+    LOG_DIR,
+    PORTFOLIO_MONEY_DIR,
+    PORTFOLIO_BACKTEST_DIR,
+)
 
-from utils import print_alpha_ans
+from utils import print_alpha_ans, q_title
 
 ##### SETTINGS BEGIN #####
 ## Q1
@@ -25,6 +31,8 @@ key_cols = ["code", "time", "open", "close", "high", "low"]
 n_output_line = 10
 
 ## Q2
+alpha_date_beg = "2018-01-01"
+n_alpha_line = 10
 
 ## Q3
 alpha_i = 2
@@ -34,13 +42,11 @@ n_layer = 5
 layer_money_init = 1e6
 trade_tax_ratio = 1e-4
 # trade_tax_ratio = 0
-
 alphas = [
     {"name": "alpha34", "func": F.alpha34},
     {"name": "alpha58", "func": F.alpha58},
     {"name": "alpha191", "func": F.alpha191},
 ]
-
 weights = [
     {"name": "equal", "func": W.equal},
     {"name": "capitalization", "func": W.money},
@@ -50,16 +56,24 @@ weights = [
 
 
 if __name__ == "__main__":
-    # In[1]
-    print("-" * 10 + "第{}题".format(1) + "-" * 10)
+    log_text = ""
 
+    # In[1]
+    print(q_title(1))
     # takes 10s
+    print("Please wait for about {} secs.".format(10), end="\r")
+
     sp = Sp(load_buff=True)
     daily = sp.code_day_fetch(target_codes, n_output_line)[key_cols]
-    print(daily)
+
+    log_text += q_title(1) + "\n"
+    log_text += "{}\n\n".format(daily)
+    print("Answer is written to the log file.")
 
     # In[2]
-    print("-" * 10 + "第{}题".format(2) + "-" * 10)
+    print(q_title(2))
+    # takes 2s
+    print("Please wait for about {} secs.".format(2), end="\r")
 
     s0_alpha34 = pd.DataFrame(
         {
@@ -85,41 +99,70 @@ if __name__ == "__main__":
     )
     s2_alpha191.name = "alpha191 of {}".format(target_codes[2])
 
-    print_alpha_ans(s0_alpha34)
-    print_alpha_ans(s1_alpha58)
-    print_alpha_ans(s2_alpha191)
+    log_text += q_title(2) + "\n"
+    log_text += print_alpha_ans(s0_alpha34, alpha_date_beg, n_alpha_line, True)
+    log_text += print_alpha_ans(s1_alpha58, alpha_date_beg, n_alpha_line, True)
+    log_text += print_alpha_ans(s2_alpha191, alpha_date_beg, n_alpha_line, True)
+    print("Answer is written to the log file.")
 
     # In[3]
-    print("-" * 10 + "第{}题".format(3) + "-" * 10)
+    print(q_title(3))
+    # takes 60s
+    print("Please wait for about {} secs.".format(60), end="\r")
 
     alpha = alphas[alpha_i]["func"]
     weight = weights[weight_i]["func"]
 
-    # takes 25s
     alpha_series = L.alpha_series(sp, alpha, load_buff=True)
 
-    back_test_key_dates = []
-    for month in BACK_TEST_MONTHS:
+    backtest_key_dates = []
+    for month in BACKTEST_MONTHS:
         eval_date, adj_date = sp.nearest_2_dates(month)
-        back_test_key_dates.append((eval_date, adj_date))
+        backtest_key_dates.append((eval_date, adj_date))
 
     money_arr = np.ones(n_layer) * layer_money_init
     ptf_money = L.layer_money_series(
         sp=sp,
         alpha_series=alpha_series,
         money_arr=money_arr,
-        back_test_key_dates=back_test_key_dates,
+        backtest_key_dates=backtest_key_dates,
         weight_func=weight,
         n_layer=n_layer,
         trade_tax_ratio=trade_tax_ratio,
     )
+    ptf_money.to_csv(PORTFOLIO_MONEY_DIR, index=True)
 
     fig, ax = plt.subplots(figsize=(16, 8))
-    L.portfolio_plot(ptf_money, back_test_key_dates, ax)
+    L.portfolio_plot(ptf_money, backtest_key_dates, ax)
+    fig_dir = FIG_DIR + "_({}_{}).pdf".format(
+        alphas[alpha_i]["name"], weights[weight_i]["name"]
+    )
     fig.savefig(
-        FIG_DIR
-        + "_({}_{}).pdf".format(alphas[alpha_i]["name"], weights[weight_i]["name"]),
-        bbox_inches="tight",
+        fig_dir, bbox_inches="tight",
     )
 
-    back_test_result = B.all_back_test(ptf_money)
+    backtest_result = B.all_backtest(ptf_money)
+    backtest_result.to_csv(PORTFOLIO_BACKTEST_DIR, index=True)
+
+    log_text += q_title(3) + "\n"
+    log_text += """SETTINGS:
+\tNumber of layers = {}
+\tWarehouse transfer = monthly
+\tFactor = {}
+\tWeight = {}
+\tTrade tax ratio = {}
+\tStart-up capital = {}\n\n""".format(
+        n_layer,
+        alphas[alpha_i]["name"],
+        weights[weight_i]["name"],
+        trade_tax_ratio,
+        layer_money_init,
+    )
+    log_text += "Portfolio money data: {}\n".format(PORTFOLIO_MONEY_DIR)
+    log_text += "Portfolio money figure: {}\n".format(fig_dir)
+    log_text += "Backtest result: {}\n".format(PORTFOLIO_BACKTEST_DIR)
+    print("Answer is written to the log file.")
+    print("Log file path: {}".format(LOG_DIR))
+
+    with open(LOG_DIR, "w") as f:
+        f.write(log_text)

@@ -14,7 +14,7 @@ from constants import (
 )
 
 
-class Back_test:
+class Backtest:
     @staticmethod
     def _daily_return_ratio(ptf_money: pd.DataFrame):
         dr = ptf_money / ptf_money.shift(1) - 1
@@ -28,26 +28,26 @@ class Back_test:
 
     @staticmethod
     def volatility(ptf_money: pd.DataFrame):
-        dr = Back_test._daily_return_ratio(ptf_money)
+        dr = Backtest._daily_return_ratio(ptf_money)
         dv = np.std(dr.iloc[1:, :], axis=0, ddof=0)
         av = dv * np.sqrt(N_ANNUAL_TRADING_DAY)
         return av
 
     @staticmethod
     def sharpe_ratio(ptf_money: pd.DataFrame):
-        av = Back_test.volatility(ptf_money)
-        ar = Back_test.return_ratio(ptf_money)
+        av = Backtest.volatility(ptf_money)
+        ar = Backtest.return_ratio(ptf_money)
         asharp = (ar - RISK_FREE_ANNUAL_RETURN_RATIO) / av
         return asharp
 
     @staticmethod
     def information_ratio(ptf_money: pd.DataFrame):
-        dr = Back_test._daily_return_ratio(ptf_money)
+        dr = Backtest._daily_return_ratio(ptf_money)
         d_risk_free_r = RISK_FREE_ANNUAL_RETURN_RATIO ** (1 / N_ANNUAL_TRADING_DAY)
         dr_surplus = dr - d_risk_free_r
         dt = np.std(dr_surplus.iloc[1:, :], axis=0, ddof=0)
         at = dt * np.sqrt(N_ANNUAL_TRADING_DAY)
-        ar = Back_test.return_ratio(ptf_money)
+        ar = Backtest.return_ratio(ptf_money)
         air = (ar - RISK_FREE_ANNUAL_RETURN_RATIO) / at
         return air
 
@@ -64,32 +64,32 @@ class Back_test:
 
     @staticmethod
     def daily_winning_ratio(ptf_money: pd.DataFrame):
-        dr = Back_test._daily_return_ratio(ptf_money)
+        dr = Backtest._daily_return_ratio(ptf_money)
         nw = (dr > 0).sum(axis=0)
         nl = (dr <= 0).sum(axis=0)
         dw = nw / (nw + nl)
         return dw
 
     @staticmethod
-    def all_back_test(ptf_money: pd.DataFrame):
-        back_tests = [
-            {"name": "annulized_return_ratio", "func": Back_test.return_ratio},
-            {"name": "annulized_volatility", "func": Back_test.volatility},
-            {"name": "annulized_sharpe_ratio", "func": Back_test.sharpe_ratio},
+    def all_backtest(ptf_money: pd.DataFrame):
+        backtests = [
+            {"name": "annulized_return_ratio", "func": Backtest.return_ratio},
+            {"name": "annulized_volatility", "func": Backtest.volatility},
+            {"name": "annulized_sharpe_ratio", "func": Backtest.sharpe_ratio},
             {
                 "name": "annulized_information_ratio",
-                "func": Back_test.information_ratio,
+                "func": Backtest.information_ratio,
             },
-            {"name": "max_drawdown_ratio", "func": Back_test.max_drawdown_ratio},
-            {"name": "daily_winning_ratio", "func": Back_test.daily_winning_ratio},
+            {"name": "max_drawdown_ratio", "func": Backtest.max_drawdown_ratio},
+            {"name": "daily_winning_ratio", "func": Backtest.daily_winning_ratio},
         ]
-        for i, back_test in enumerate(back_tests):
+        for i, backtest in enumerate(backtests):
             if i == 0:
-                back_test_result = pd.DataFrame(
-                    {back_test["name"]: back_test["func"](ptf_money)}
+                backtest_result = pd.DataFrame(
+                    {backtest["name"]: backtest["func"](ptf_money)}
                 )
             else:
-                back_test_result[back_test["name"]] = back_test["func"](ptf_money)
-        back_test_result.index = range(ptf_money.shape[1])
-        back_test_result.index.name = "portfolio"
-        return back_test_result
+                backtest_result[backtest["name"]] = backtest["func"](ptf_money)
+        backtest_result.index = range(ptf_money.shape[1])
+        backtest_result.index.name = "portfolio"
+        return backtest_result

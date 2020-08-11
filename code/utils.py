@@ -18,6 +18,10 @@ class Timer(object):
         print("[finished, spent time: {time:.2f}s]".format(time=time.time() - self.t0))
 
 
+def q_title(n):
+    return "-" * 10 + "Question {}".format(n) + "-" * 10
+
+
 def str2date(date: str = "2020-08-01"):
     return datetime.datetime.strptime(date, "%Y-%m-%d")
 
@@ -26,12 +30,19 @@ def date2str(date: [datetime.datetime, Timestamp]):
     return datetime.datetime.strftime(date, "%Y-%m-%d")
 
 
-def print_alpha_ans(df, date_beg: str = "2018-01-01", n_day: int = 10):
-    print("{}:".format(df.name))
+def print_alpha_ans(df, date_beg: str = "2018-01-01", n_day: int = 10, to_str=False):
+    if to_str:
+        s = "{}:\n".format(df.name)
+    else:
+        print("{}:".format(df.name))
     date_beg = str2date(date_beg)
     df = df[df["time"] >= date_beg].iloc[:n_day, :]
-    print(df)
-    print("")
+    if to_str:
+        s += "{}\n\n".format(df)
+        return s
+    else:
+        print(df)
+        print("")
 
 
 def date_arr_p1(date_arr):

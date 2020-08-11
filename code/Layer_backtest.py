@@ -23,7 +23,7 @@ from constants import (
 )
 
 
-class Layer_back_test:
+class Layer_backtest:
     @staticmethod
     def devide_weights(
         w: pd.Series, idx: pd.Index, alpha_series: pd.Series, n_layer: int
@@ -98,7 +98,7 @@ class Layer_back_test:
         if load_buff and os.path.isfile(BUFF_ALPHA_DIR):
             with open(BUFF_ALPHA_DIR, "rb") as f:
                 alpha_series = pickle.load(f)
-            print('Loaded stock prices from: {}'.format(BUFF_ALPHA_DIR))
+            print("Loaded stock prices from: {}".format(BUFF_ALPHA_DIR))
         else:
             alpha_series = sp.data.groupby("code").apply(alpha_func)
             alpha_series = alpha_series.reset_index()
@@ -107,7 +107,7 @@ class Layer_back_test:
             if buff or load_buff:
                 with open(BUFF_ALPHA_DIR, "wb") as f:
                     pickle.dump(alpha_series, f)
-                print('Dumped stock prices to: {}'.format(BUFF_ALPHA_DIR))
+                print("Dumped stock prices to: {}".format(BUFF_ALPHA_DIR))
         return alpha_series
 
     @staticmethod
@@ -127,7 +127,7 @@ class Layer_back_test:
         layer_info_arr0: Iterable = None,
     ):
         w, idx = weight_func(sp, eval_date)
-        layer_idx_dicts = Layer_back_test.devide_weights(w, idx, alpha_series, n_layer)
+        layer_idx_dicts = Layer_backtest.devide_weights(w, idx, alpha_series, n_layer)
         buyin_code_arr = [
             sp.data.loc[i["index_c"], "code"].tolist() for i in layer_idx_dicts
         ]
@@ -135,7 +135,7 @@ class Layer_back_test:
         buyin_info_arr = []
         df_buyin_on_code = sp.data[sp.data["time"] == adj_date].set_index("code")
         if not layer_info_arr0 is None:
-            buyin_n0_df = Layer_back_test.buyin_n_df(layer_info_arr0, sp=sp)[
+            buyin_n0_df = Layer_backtest.buyin_n_df(layer_info_arr0, sp=sp)[
                 0
             ].set_index("code")
         for i in range(n_layer):
@@ -281,7 +281,7 @@ class Layer_back_test:
         df = df.loc[s1 & s2, ["time", "code", "open", "close"]]
         # not every stock apears everyday
         # merge number of stocks to price data
-        df, money_left_arr = Layer_back_test.buyin_n_df(layer_info_arr, df)
+        df, money_left_arr = Layer_backtest.buyin_n_df(layer_info_arr, df)
 
         money_df = pd.DataFrame(
             {
@@ -298,8 +298,8 @@ class Layer_back_test:
     def buyin_n_diff(
         sp: Stockprice, layer_info_arr1: Iterable, layer_info_arr2: Iterable,
     ):
-        df1, money_left_arr1 = Layer_back_test.buyin_n_df(layer_info_arr1, sp=sp)
-        df2, money_left_arr2 = Layer_back_test.buyin_n_df(layer_info_arr2, sp=sp)
+        df1, money_left_arr1 = Layer_backtest.buyin_n_df(layer_info_arr1, sp=sp)
+        df2, money_left_arr2 = Layer_backtest.buyin_n_df(layer_info_arr2, sp=sp)
         n_cols = [i for i in df1.columns if i not in ["time", "code"]]
         df1[n_cols] = df2[n_cols] - df1[n_cols]
         return df1
@@ -309,7 +309,7 @@ class Layer_back_test:
         sp: Stockprice,
         alpha_series: pd.Series,
         money_arr: Iterable,
-        back_test_key_dates: Iterable,
+        backtest_key_dates: Iterable,
         weight_func,
         n_layer: int,
         trade_tax_ratio: float,
@@ -317,11 +317,11 @@ class Layer_back_test:
         ptf_money = None
         buyin_info_arr0 = None
         layer_info_total = []
-        for i, (eval_date, adj_date) in enumerate(back_test_key_dates[:-1]):
+        for i, (eval_date, adj_date) in enumerate(backtest_key_dates[:-1]):
             print(
-                "Running back test... ({}/{})".format(i, len(back_test_key_dates) - 2)
+                "Running back test... ({}/{})".format(i, len(backtest_key_dates) - 2)
             )
-            buyin_info_arr = Layer_back_test.buyin_info(
+            buyin_info_arr = Layer_backtest.buyin_info(
                 sp=sp,
                 alpha_series=alpha_series,
                 weight_func=weight_func,
@@ -333,11 +333,11 @@ class Layer_back_test:
                 layer_info_arr0=buyin_info_arr0,
             )
             layer_info_total.append(buyin_info_arr)
-            ptf_money_total_df = Layer_back_test.weighted_sum(
+            ptf_money_total_df = Layer_backtest.weighted_sum(
                 sp=sp,
                 layer_info_arr=buyin_info_arr,
                 date_beg=date2str(adj_date),
-                date_end=date2str(back_test_key_dates[i + 1][1]),
+                date_end=date2str(backtest_key_dates[i + 1][1]),
                 typ="eq",  # leq geq eq neq
                 price_typ="close",
             )
@@ -351,15 +351,15 @@ class Layer_back_test:
 
     @staticmethod
     def portfolio_plot(
-        ptf_money: pd.DataFrame, back_test_key_dates: Iterable = None, ax=None
+        ptf_money: pd.DataFrame, backtest_key_dates: Iterable = None, ax=None
     ):
         if ax is None:
             fig, ax = plt.subplots(figsize=(16, 8))
         for layer in range(ptf_money.shape[1]):
             s = ptf_money.iloc[:, layer]
             ax.plot(s.index, s, label="portfolio {}".format(layer))
-        if not back_test_key_dates is None:
-            for i, (eval_date, adj_date) in enumerate(back_test_key_dates[:-1]):
+        if not backtest_key_dates is None:
+            for i, (eval_date, adj_date) in enumerate(backtest_key_dates[:-1]):
                 ax.axvline(
                     x=adj_date,
                     color="grey",

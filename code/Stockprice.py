@@ -13,7 +13,7 @@ import pickle
 import os
 import matplotlib.pyplot as plt
 
-from constants import DATA_DIR, BUFF_SP_DIR, TYPE_E, BACK_TEST_MONTHS
+from constants import DATA_DIR, BUFF_SP_DIR, TYPE_E, BACKTEST_MONTHS
 from utils import str2date
 
 
@@ -28,7 +28,7 @@ class Stockprice(object):
         if load_buff and os.path.isfile(BUFF_SP_DIR):
             with open(BUFF_SP_DIR, "rb") as f:
                 self.data = pickle.load(f)
-            print('Loaded stock prices from: {}'.format(BUFF_SP_DIR))
+            print("Loaded stock prices from: {}".format(BUFF_SP_DIR))
         else:
             test_nrows = 1000
             if isinstance(test, int) and test > 0:
@@ -39,17 +39,17 @@ class Stockprice(object):
             df["time"] = pd.to_datetime(df["time"], format="%Y-%m-%d")
             df = df[df.isnull().sum(axis=1) != df.shape[1] - 2]
             self.data = df.sort_values(["time", "code"], ascending=True)
-            self._back_test_wash()
+            self._backtest_wash()
             self._fill_daily_stockprice()
             if buff or load_buff:
                 with open(BUFF_SP_DIR, "wb") as f:
                     pickle.dump(self.data, f)
-                print('Dumped stock prices to: {}'.format(BUFF_SP_DIR))
+                print("Dumped stock prices to: {}".format(BUFF_SP_DIR))
 
-    def _back_test_wash(self):
+    def _backtest_wash(self):
         df = self.data
         key_dates = []
-        for month in BACK_TEST_MONTHS:
+        for month in BACKTEST_MONTHS:
             eval_date, adj_date = self.nearest_2_dates(month)
             key_dates.append(eval_date)
             key_dates.append(adj_date)
