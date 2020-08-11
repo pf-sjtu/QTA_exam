@@ -16,7 +16,8 @@ if not os.path.isdir("../output"):
 TYPE_E = "{}: improper types or lengths of parameters."
 VALUE_E = "{}: improper range of parameters."
 DATA_DIR = "../input/stockprice.csv"
-BUFF_DIR = "../input/stockprice.pickle"
+BUFF_SP_DIR = "../input/stockprice.pickle"
+BUFF_ALPHA_DIR = "../input/alpha_series.pickle"
 FIG_DIR = "../output/portfolio_back_test"
 
 

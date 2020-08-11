@@ -8,15 +8,17 @@ Created on Fri Aug  7 22:30:11 2020
 import numpy as np
 import pandas as pd
 import sys
+import matplotlib.pyplot as plt
+import os
+import pickle
 
 from Stockprice import Stockprice
 from utils import str2date, date2str
 from constants import (
+    BUFF_ALPHA_DIR,
     VALUE_E,
     N_MONEY_ADJ_ITER_A,
     N_MONEY_ADJ_ITER_B,
-    N_ANNUAL_TRADING_DAY,
-    RISK_FREE_ANNUAL_RETURN_RATIO,
 )
 
 
@@ -89,11 +91,20 @@ class Layer_back_test:
         return layer_idx_dicts
 
     @staticmethod
-    def alpha_series(sp: Stockprice, alpha_func):
-        alpha_series = sp.data.groupby("code").apply(alpha_func)
-        alpha_series = alpha_series.reset_index()
-        alpha_series.columns = ["code", "index", "alpha"]
-        alpha_series = alpha_series.set_index("index")["alpha"]
+    def alpha_series(
+        sp: Stockprice, alpha_func, buff: bool = False, load_buff: bool = False,
+    ):
+        if load_buff and os.path.isfile(BUFF_ALPHA_DIR):
+            with open(BUFF_ALPHA_DIR, "rb") as f:
+                alpha_series = pickle.load(f)
+        else:
+            alpha_series = sp.data.groupby("code").apply(alpha_func)
+            alpha_series = alpha_series.reset_index()
+            alpha_series.columns = ["code", "index", "alpha"]
+            alpha_series = alpha_series.set_index("index")["alpha"]
+            if buff:
+                with open(BUFF_ALPHA_DIR, "wb") as f:
+                    pickle.dump(alpha_series, f)
         return alpha_series
 
     @staticmethod
@@ -288,40 +299,67 @@ class Layer_back_test:
         return df1
 
     @staticmethod
-    def return_ratio(ptf_money: pd.DataFrame):
-        r = ptf_money.iloc[-1, :] / ptf_money.iloc[0, :]
-        ar = r ** (N_ANNUAL_TRADING_DAY / r.shape[0])
-        return ar
+    def layer_money_series(
+        sp: Stockprice,
+        alpha_series: pd.Series,
+        money_arr: list,
+        back_test_key_dates: list,
+        weight_func,
+        n_layer: int,
+        trade_tax_pct: float,
+    ):
+        ptf_money = None
+        buyin_info_arr0 = None
+        layer_info_total = []
+        for i, (eval_date, adj_date) in enumerate(back_test_key_dates[:-1]):
+            print(
+                "Running back test... ({}/{})".format(i, len(back_test_key_dates) - 2)
+            )
+            buyin_info_arr = Layer_back_test.buyin_info(
+                sp=sp,
+                alpha_series=alpha_series,
+                weight_func=weight_func,
+                n_layer=n_layer,
+                money_arr=money_arr,
+                trade_tax_pct=trade_tax_pct,
+                eval_date=date2str(eval_date),
+                adj_date=date2str(adj_date),
+                layer_info_arr0=buyin_info_arr0,
+            )
+            layer_info_total.append(buyin_info_arr)
+            ptf_money_total_df = Layer_back_test.weighted_sum(
+                sp=sp,
+                layer_info_arr=buyin_info_arr,
+                date_beg=date2str(adj_date),
+                date_end=date2str(back_test_key_dates[i + 1][1]),
+                typ="eq",  # leq geq eq neq
+                price_typ="close",
+            )
+            if ptf_money is None:
+                ptf_money = ptf_money_total_df
+                buyin_info_arr0 = buyin_info_arr
+            else:
+                ptf_money = pd.concat([ptf_money, ptf_money_total_df], axis=0)
+            money_arr = ptf_money_total_df.iloc[-1, :]
+        return ptf_money
 
     @staticmethod
-    def volatility(ptf_money: pd.DataFrame):
-        dr = ptf_money / ptf_money.shift(1)
-        dv = np.std(dr.iloc[1:, :], axis=0, ddof=0)
-        av = dv * np.sqrt(N_ANNUAL_TRADING_DAY)
-        return av
-
-    @staticmethod
-    def sharpe_ratio(ptf_money: pd.DataFrame):
-        av = Layer_back_test.volatility(ptf_money)
-        ar = Layer_back_test.return_ratio(ptf_money)
-        asharp = (ar - RISK_FREE_ANNUAL_RETURN_RATIO) / av
-        return asharp
-
-    @staticmethod
-    def information_ratio(ptf_money: pd.DataFrame):
-        dr = ptf_money / ptf_money.shift(1)
-        d_risk_free_r = RISK_FREE_ANNUAL_RETURN_RATIO ** (1 / N_ANNUAL_TRADING_DAY)
-        dr_surplus = dr - d_risk_free_r
-        dt = np.std(dr_surplus.iloc[1:, :], axis=0, ddof=0)
-        at = dt * np.sqrt(N_ANNUAL_TRADING_DAY)
-        ar = Layer_back_test.return_ratio(ptf_money)
-        air = (ar - RISK_FREE_ANNUAL_RETURN_RATIO) / at
-        return air
-
-    @staticmethod
-    def max_drawdown(ptf_money: pd.DataFrame):
-        return 1
-
-    @staticmethod
-    def winning_ratio(ptf_money: pd.DataFrame):
-        return 1
+    def portfolio_plot(
+        ptf_money: pd.DataFrame, back_test_key_dates: list = None, ax=None
+    ):
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(16, 8))
+        for layer in range(ptf_money.shape[1]):
+            s = ptf_money.iloc[:, layer]
+            ax.plot(s.index, s, label="portfolio {}".format(layer))
+        if not back_test_key_dates is None:
+            for i, (eval_date, adj_date) in enumerate(back_test_key_dates[:-1]):
+                ax.axvline(
+                    x=adj_date,
+                    color="grey",
+                    linestyle="--",
+                    label="warehouse transfer date" if i == 0 else None,
+                )
+        ax.legend(loc="upper right")
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Close Price")

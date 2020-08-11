@@ -14,7 +14,7 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib
 
-from constants import DATA_DIR, BUFF_DIR, TYPE_E, VALUE_E, BACK_TEST_MONTHS
+from constants import DATA_DIR, BUFF_SP_DIR, TYPE_E, VALUE_E, BACK_TEST_MONTHS
 from utils import str2date
 
 
@@ -26,8 +26,8 @@ class Stockprice(object):
         buff: bool = False,
         load_buff: bool = False,
     ):
-        if load_buff and os.path.isfile(BUFF_DIR):
-            with open(BUFF_DIR, "rb") as f:
+        if load_buff and os.path.isfile(BUFF_SP_DIR):
+            with open(BUFF_SP_DIR, "rb") as f:
                 self.data = pickle.load(f)
         else:
             test_nrows = 1000
@@ -42,7 +42,7 @@ class Stockprice(object):
             self._back_test_wash()
             self._fill_daily_stockprice()
             if buff:
-                with open(BUFF_DIR, "wb") as f:
+                with open(BUFF_SP_DIR, "wb") as f:
                     pickle.dump(self.data, f)
 
     def _back_test_wash(self):
