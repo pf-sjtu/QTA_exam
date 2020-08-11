@@ -318,9 +318,7 @@ class Layer_backtest:
         buyin_info_arr0 = None
         layer_info_total = []
         for i, (eval_date, adj_date) in enumerate(backtest_key_dates[:-1]):
-            print(
-                "Running back test... ({}/{})".format(i, len(backtest_key_dates) - 2)
-            )
+            print("Running back test... ({}/{})".format(i, len(backtest_key_dates) - 2))
             buyin_info_arr = Layer_backtest.buyin_info(
                 sp=sp,
                 alpha_series=alpha_series,

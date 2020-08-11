@@ -52,6 +52,7 @@ weights = [
     {"name": "capitalization", "func": W.money},
 ]
 
+TEST_MODE = False
 ##### SETTINGS END #####
 
 
@@ -63,12 +64,12 @@ if __name__ == "__main__":
     # takes 10s
     print("Please wait for about {} secs.".format(10), end="\r")
 
-    sp = Sp(load_buff=True)
+    sp = Sp(load_buff=TEST_MODE)
     daily = sp.code_day_fetch(target_codes, n_output_line)[key_cols]
 
     log_text += q_title(1) + "\n"
     log_text += "{}\n\n".format(daily)
-    print("Answer is written to the log file.")
+    print("Answer is written to the log file.\n")
 
     # In[2]
     print(q_title(2))
@@ -103,7 +104,7 @@ if __name__ == "__main__":
     log_text += print_alpha_ans(s0_alpha34, alpha_date_beg, n_alpha_line, True)
     log_text += print_alpha_ans(s1_alpha58, alpha_date_beg, n_alpha_line, True)
     log_text += print_alpha_ans(s2_alpha191, alpha_date_beg, n_alpha_line, True)
-    print("Answer is written to the log file.")
+    print("Answer is written to the log file.\n")
 
     # In[3]
     print(q_title(3))
@@ -113,7 +114,7 @@ if __name__ == "__main__":
     alpha = alphas[alpha_i]["func"]
     weight = weights[weight_i]["func"]
 
-    alpha_series = L.alpha_series(sp, alpha, load_buff=True)
+    alpha_series = L.alpha_series(sp, alpha, load_buff=TEST_MODE)
 
     backtest_key_dates = []
     for month in BACKTEST_MONTHS:
